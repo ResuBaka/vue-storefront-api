@@ -14,45 +14,27 @@ import { makeExecutableSchema } from 'graphql-tools';
 import resolvers from './graphql/resolvers';
 import typeDefs from './graphql/schema';
 import * as path from 'path'
+import { NestFactory } from '@nestjs/core';
+import { ExpressAdapter, NestExpressApplication } from '@nestjs/platform-express';
+import { AppModule } from './app.module';
 
-const app = express();
+const expressApp = express();
 
 // logger
-app.use(morgan('dev'));
+expressApp.use(morgan('dev'));
 
-app.use('/media', express.static(path.join(__dirname, config.get(`${config.get('platform')}.assetPath`))))
+expressApp.use('/media', express.static(path.join(__dirname, config.get(`${config.get('platform')}.assetPath`))))
 
 // 3rd party middleware
-app.use(cors({
+expressApp.use(cors({
   exposedHeaders: config.get('corsHeaders')
 }));
 
-app.use(bodyParser.json({
+expressApp.use(bodyParser.json({
   limit: config.get('bodyLimit')
 }));
 
 loadAdditionalCertificates()
-
-// connect to db
-initializeDb(db => {
-  // internal middleware
-  app.use(middleware({ config, db }));
-
-  // api router
-  app.use('/api', api({ config, db }));
-  app.use('/img', img({ config, db }));
-  app.use('/img/:width/:height/:action/:image', (req, res, next) => {
-    console.log(req.params)
-  });
-  app.post('/invalidate', invalidateCache)
-  app.get('/invalidate', invalidateCache)
-
-  const port = process.env.PORT || config.get('server.port')
-  const host = process.env.HOST || config.get('server.host')
-  app.listen(parseInt(port), host, () => {
-    console.log(`Vue Storefront API started at http://${host}:${port}`);
-  });
-});
 
 // graphQl Server part
 const schema = makeExecutableSchema({
@@ -60,15 +42,36 @@ const schema = makeExecutableSchema({
   resolvers
 });
 
-app.use(bodyParser.urlencoded({ extended: true }));
-app.use(bodyParser.json());
+expressApp.use(bodyParser.urlencoded({ extended: true }));
+expressApp.use(bodyParser.json());
 
-app.use('/graphql', graphqlExpress(req => ({
+expressApp.use('/graphql', graphqlExpress(req => ({
   schema,
   context: { req: req },
   rootValue: global
 })));
 
-app.use('/graphiql', graphiqlExpress({ endpointURL: '/graphql' }));
+expressApp.use('/graphiql', graphiqlExpress({ endpointURL: '/graphql' }));
 
-export default app;
+// connect to db
+initializeDb(async db => {
+  // internal middleware
+  expressApp.use(middleware({ config, db }));
+
+  // api router
+  expressApp.use('/api', api({ config, db }));
+  expressApp.use('/img', img({ config, db }));
+  expressApp.use('/img/:width/:height/:action/:image', (req, res, next) => {
+    console.log(req.params)
+  });
+  expressApp.post('/invalidate', invalidateCache)
+  expressApp.get('/invalidate', invalidateCache)
+  const port = process.env.PORT || config.get('server.port')
+  const host = process.env.HOST || config.get('server.host')
+
+  // @ts-ignore
+  const app = await NestFactory.create<NestExpressApplication>(AppModule, new ExpressAdapter(expressApp));
+  await app.listen(parseInt(port + 1), host, () => {
+    console.log(`Vue Storefront API started at http://${host}:${port}`);
+  });
+});

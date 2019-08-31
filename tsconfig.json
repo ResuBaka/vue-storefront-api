@@ -1,11 +1,13 @@
 {
   "compilerOptions": {
-    "target": "es6",
+    "target": "es2017",
     "strict": false,
     "allowJs": true,
     "importHelpers": true,
     "module": "commonjs",
     "moduleResolution": "node",
+    "declaration": true,
+    "removeComments": true,
     "experimentalDecorators": true,
     "emitDecoratorMetadata": true,
     "esModuleInterop": true,
@@ -13,9 +15,14 @@
     "outDir": "dist",
     "sourceMap": true,
     "baseUrl": ".",
-    "lib": ["es7"]
+    "lib": ["es7"],
+    "paths": {
+      "@api": "src/api/*",
+      "@src": "src/*"
+    }
   },
   "include": [
     "src/**/*"
-  ]
+  ],
+  "exclude": ["node_modules", "dist"]
 }
